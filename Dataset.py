@@ -1,5 +1,5 @@
 import pandas as pd
-from keras.src.datasets.boston_housing import load_data
+from sklearn.preprocessing import StandardScaler
 
 
 class Dataset:
@@ -17,9 +17,9 @@ class Dataset:
         """Export data in a CSV file."""
         if self.data is None:
             print("Data not loaded. Please load the data first.")
-        else:
-            print("Loading DataFrame")
-            self.data.to_csv(file_name, index = False)
+            return
+        print("Loading DataFrame")
+        self.data.to_csv(file_name, index = False)
 
     def visualize_dataset(self, type=None, n_cols=5):
         """View the first few rows of the dataset."""
@@ -38,9 +38,11 @@ class Dataset:
 
     def left_join_dataframe(self, new_data, keys):
         """Join a Dataframe from a given key"""
+        if self.data is None:
+            print("Data not loaded. Please load the data first.")
+            return
         print("-------- Joining the datasets ---------------")
         self.data = pd.merge(self.data, new_data, on=keys, how="left")
-
 
     def check_equal_columns(self, col1, col2):
         if self.data is None:
@@ -52,50 +54,74 @@ class Dataset:
         """Drop specified columns from the dataset."""
         if self.data is None:
             print("Data not loaded. Please load the data first.")
-        else:
-            print(f"---------------------- Dropping column {columns} --------------------------")
-            self.data = self.data.drop(columns=columns)
+            return
+        print(f"---------------------- Dropping columns {columns} --------------------------")
+        self.data = self.data.drop(columns=columns)
 
-    def fill_NaN (self):
-        """Fill NaN values of the dataset"""
+    def drop_negative_values(self, columns):
         if self.data is None:
             print("Data not loaded. Please load the data first.")
-        else:
-            for cols in self.data.columns:
-                if self.data[cols].isnull().any():
-                    if self.data[cols].dtype == 'int64':
-                        self.fill_NaN_int(cols)
-                    elif self.data[cols].dtype == 'float64':
-                        self.fill_NaN_float(cols)
-                    else:
-                        self.fill_NaN_object(cols)
+            return
+        for col in columns:
+            print(f"---------------------- Dropping rows by negative values in {col} --------------------------")
+            self.data = self.data[self.data[col] >= 0]
 
-    def fill_NaN_int (self, col):
-        """Fill NaN values of a column of integers"""
-        median = self.data[col].median()
-        self.data[col] = self.data[col].fillna(median)
+    def set_zeros_MarkDown(self, columns):
+        if self.data is None:
+            print("Data not loaded. Please load the data first.")
+            return
+        mask = self.data[columns].notna().any(axis=1)
+        self.data.loc[mask, columns] = self.data.loc[mask, columns].fillna(0)
 
-    def fill_NaN_float (self, col):
-        """Fill NaN values of a column of floats"""
-        mean = self.data[col].mean()
-        self.data[col] = self.data[col].fillna(mean)
+    def drop_nan_rows(self, columns):
+        if self.data is None:
+            print("Data not loaded. Please load the data first.")
+            return
+        for col in columns:
+            print(f"---------------------- Dropping rows by NaN values in {col} --------------------------")
+            self.data = self.data.dropna(subset=[col])
 
-    def fill_NaN_object (self, col):
-        """Fill NaN values of a column of objects"""
-        mode = self.data[col].mode()[0]
-        self.data[col] = self.data[col].fillna(mode)
+    def split_date(self, date_col):
+        if self.data is None:
+            print("Data not loaded. Please load the data first.")
+            return
+        print(f"---------------------- Splitting date in column {date_col} --------------------------")
+        self.data[date_col] = pd.to_datetime(self.data[date_col], format='%Y-%m-%d', errors='coerce')
 
-    def convert_string_to_number (self, col):
-        """Convert column of type object containing numbers to type int or float"""
-        self.data[col] = pd.to_numeric(self.data[col], errors='coerce')
+        self.data['Day'] = self.data[date_col].dt.day
+        self.data['Month'] = self.data[date_col].dt.month
+        self.data['Year'] = self.data[date_col].dt.year
 
-    def map_column (self, col, mapping):
-        """Mappa i valori di una colonna secondo il dizionario dato."""
-        self.data[col] = self.data[col].map(mapping)
-
-    def convert_nominal (self, columns):
+    def convert_nominal(self, columns):
         """Substitute nominal columns with dummy variables"""
+        if self.data is None:
+            print("Data not loaded. Please load the data first.")
+            return
         for col in columns:
             dummies = pd.get_dummies(self.data[col], prefix=col, dummy_na=False)
             self.data = pd.concat([self.data, dummies], axis=1)
             self.data = self.data.drop(columns=[col])
+
+    def standardize_dataset(self, exclude):
+        if self.data is None:
+            print("Data not loaded. Please load the data first.")
+            return
+        print(f"---------------------- Start standardization --------------------------")
+        df_scaled = self.data.copy()
+        numeric_cols = df_scaled.select_dtypes(include=['float64', 'int64']).columns.tolist()
+        numeric_cols = [c for c in numeric_cols if c not in exclude]
+        print("Numerical columns to be standardized:", numeric_cols)
+
+        scaler = StandardScaler()
+        df_scaled[numeric_cols] = scaler.fit_transform(df_scaled[numeric_cols])
+        print(f"---------------------- Standardization complete --------------------------")
+
+        return df_scaled, scaler
+
+
+    def to_categorical(self, columns):
+        if self.data is None:
+            print("Data not loaded. Please load the data first.")
+            return
+        for col in columns:
+            self.data[col] = self.data[col].astype('category')
