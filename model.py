@@ -1,7 +1,7 @@
-from sklearn.ensemble import RandomForestRegressor
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
-from sklearn.linear_model import LinearRegression , Ridge as SKRidge
+from sklearn.linear_model import ElasticNet, Lasso, LinearRegression, Ridge as SKRidge
 from sklearn.model_selection import train_test_split
+from sklearn.ensemble import RandomForestRegressor
 from sklearn.preprocessing import StandardScaler
 from sklearn.tree import DecisionTreeRegressor
 from xgboost import XGBRegressor
@@ -9,7 +9,6 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import numpy as np
 import time
-
 
 
 class RegressionModel:
@@ -29,7 +28,7 @@ class RegressionModel:
         if not hasattr(self, "X_train_scaled"):
            print("Data not scaled yet. Scaling now")
            self.scale_data()
-           start = time.time()
+        start = time.time()
         self.model.fit(self.X_train_scaled, self.y_train)
         elapsed = time.time() - start
         print(f"training complete. Elapsed time: {elapsed:.3f} s")
@@ -46,7 +45,7 @@ class RegressionModel:
         print(f"MAE: {mae:.3f}")
         print(f"RMSE: {rmse:.3f}")
         print(f"R²: {r2:.3f}")
-        self.plots(y_pred)
+        #self.plots(y_pred)
 
 
     def plots(self, y_pred):
@@ -66,7 +65,7 @@ class RegressionModel:
         plt.ylabel("Residuals")
         plt.title("Residual Plot")
         plt.show()
-    
+
     def scale_data(self):
         scaler = StandardScaler()
         self.X_train_scaled = scaler.fit_transform(self.X_train)
@@ -81,20 +80,20 @@ class LinReg(RegressionModel):
         super().__init__(dataset)
         self.model = LinearRegression()
 
-class Ridge(RegressionModel):
-    def __init__(self, dataset, alpha=1.0, random_state=42):
+class RidgeModel(RegressionModel):
+    def __init__(self, dataset, alpha=1.0):
         super().__init__(dataset)
-        self.model = SKRidge(alpha, random_state)
+        self.model = SKRidge(alpha)
 
-class Lasso(RegressionModel):
-    def __init__(self, dataset, alpha=1.0, random_state=42):
+class LassoModel(RegressionModel):
+    def __init__(self, dataset, alpha=1.0):
         super().__init__(dataset)
-        self.model = Lasso(alpha, random_state)
+        self.model = Lasso(alpha)
 
-class ElasticNet(RegressionModel):
+class ElasticNetModel(RegressionModel):
     def __init__(self, dataset, alpha=1.0, l1_ratio=0.5, random_state=42):
         super().__init__(dataset)
-        self.model = ElasticNet(alpha, l1_ratio, random_state)
+        self.model = ElasticNet(alpha=alpha, l1_ratio=l1_ratio, random_state=random_state)
 
 # Non-linear tree based models
 class DecisionTreeRegressorModel(RegressionModel):
@@ -325,3 +324,78 @@ class TransformerNN(NeuralNetwork):
         self.model = models.Model(inputs=inputs, outputs=outputs)
         self.model.compile(optimizer='adam', loss='mean_squared_error')
         print(self.model.summary())
+
+
+from Dataset import Dataset
+import pandas as pd
+def __main__():
+    dataset = Dataset("Walmart\\dataset_cleaned_no_MarkDown_split_date.csv")
+    dataset.convert_nominal(columns=["Type"])
+    dataset.drop_columns(columns=["Fuel_Price", "CPI", "Unemployment"])
+    #dataset = pd.get_dummies(dataset, columns=["Type"], drop_first=True)
+    #dataset = dataset.drop(columns=["Fuel_Price", "CPI", "Unemployment"])
+    #droppato date
+    #dataset = dataset.drop(columns=["Day", "Month", "Year"]) 
+    
+    lin_reg_model = LinReg(dataset)
+    lin_reg_model.split_data(target_column="Weekly_Sales")
+    lin_reg_model.train()
+    lin_reg_model.evaluate()
+    print(lin_reg_model.model.coef_)
+
+    lin_reg_model = RidgeModel(dataset)
+    lin_reg_model.split_data(target_column="Weekly_Sales")
+    lin_reg_model.train()
+    lin_reg_model.evaluate()
+
+    lin_reg_model = LassoModel(dataset)
+    lin_reg_model.split_data(target_column="Weekly_Sales")
+    lin_reg_model.train()
+    lin_reg_model.evaluate()
+
+    lin_reg_model = ElasticNetModel(dataset)
+    lin_reg_model.split_data(target_column="Weekly_Sales")
+    lin_reg_model.train()
+    lin_reg_model.evaluate()
+
+    # Non-linear models
+    dataset.data['Store'] = dataset.data['Store'].astype('category')
+    dataset.data['Dept'] = dataset.data['Dept'].astype('category')
+
+    lin_reg_model = DecisionTreeRegressorModel(dataset)
+    lin_reg_model.split_data(target_column="Weekly_Sales")
+    lin_reg_model.train()
+    lin_reg_model.evaluate()
+
+    lin_reg_model = RandomForestRegressorModel(dataset)
+    lin_reg_model.split_data(target_column="Weekly_Sales")
+    lin_reg_model.train()
+    lin_reg_model.evaluate()
+
+    lin_reg_model = XGBoostRegressorModel(dataset)
+    lin_reg_model.split_data(target_column="Weekly_Sales")
+    lin_reg_model.train()
+    lin_reg_model.evaluate()
+
+
+    # Neural Networks
+    ffn_model = FeedforwardNN(dataset)
+    ffn_model.split_data(target_column="Weekly_Sales")
+    ffn_model.train(epochs=50)
+    ffn_model.evaluate()
+    '''
+    lstm_model = LSTM(dataset, timesteps=5)
+    lstm_model.split_data(target_column="Weekly_Sales")
+
+    X_seq, y_seq = model.prepare_sequences(target_column="Weekly_Sales")
+    lstm_model.scale_data()
+
+    # Step 4: build and train
+    model.build_model()
+    model.train(epochs=50, batch_size=32)
+
+    # Step 5: evaluate
+    model.evaluate()
+    '''
+if __name__ == "__main__":
+    __main__()
