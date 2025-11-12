@@ -12,6 +12,8 @@ import pandas as pd
 import tensorflow as tf
 import numpy as np
 import time
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import LSTM as KerasLSTM, Dense, Input
 
 
 class RegressionModel:
@@ -39,7 +41,7 @@ class RegressionModel:
     def prediction(self):
         return self.model.predict(self.X_test_scaled)
 
-    def evaluate(self):
+    def evaluate(self, plot=False):
         y_pred = self.model.predict(self.X_test_scaled)
         mae = mean_absolute_error(self.y_test, y_pred)
         rmse = np.sqrt(mean_squared_error(self.y_test, y_pred))
@@ -48,8 +50,8 @@ class RegressionModel:
         print(f"MAE: {mae:.3f}")
         print(f"RMSE: {rmse:.3f}")
         print(f"R²: {r2:.3f}")
-
-        #self.plots(y_pred)
+        if plot:
+            self.plots(y_pred)
 
 
     def plots(self, y_pred):
@@ -72,9 +74,16 @@ class RegressionModel:
 
     def scale_data(self):
         scaler = StandardScaler()
-        self.X_train_scaled = scaler.fit_transform(self.X_train)
-        self.X_test_scaled = scaler.transform(self.X_test)
 
+        numeric_cols = self.X_train.select_dtypes(include=['float64', 'int64']).columns.tolist()
+        exclude = ['Store', 'Dept', 'Day_sin', 'Day_cos', 'Month_sin', 'Month_cos', 'Years_since_start']
+        numeric_cols = [c for c in numeric_cols if c not in exclude]
+
+        print("Numerical columns to be standardized:", numeric_cols)
+        self.X_train_scaled = self.X_train.copy()
+        self.X_test_scaled = self.X_test.copy()
+        self.X_train_scaled[numeric_cols] = scaler.fit_transform(self.X_train[numeric_cols])
+        self.X_test_scaled[numeric_cols] = scaler.fit_transform(self.X_test[numeric_cols])
         # print confirmation message
         print("Data scaling complete.")
 
@@ -113,7 +122,8 @@ class RandomForestRegressorModel(RegressionModel):
 class XGBoostRegressorModel(RegressionModel):
     def __init__(self, dataset, n_estimators=100, learning_rate=0.1, random_state=42):
         super().__init__(dataset)
-        self.model = XGBRegressor(n_estimators=n_estimators, learning_rate=learning_rate, random_state=random_state)
+        self.model = XGBRegressor(n_estimators=n_estimators, learning_rate=learning_rate, random_state=random_state,
+                                  enable_categorical=True, tree_method="hist")
 
 # Autoregressive models
 class ARIMAModel(RegressionModel):
@@ -159,8 +169,8 @@ class ARIMAModel(RegressionModel):
         if plots:
             self.plots(y_pred)
 
-from tensorflow.keras.models import Sequential 
-from tensorflow.keras.layers import LSTM as KerasLSTM, Dense, Input 
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import LSTM as KerasLSTM, Dense, Input
 
 class NeuralNetwork:
     def __init__(self, dataset):
@@ -177,9 +187,16 @@ class NeuralNetwork:
     
     def scale_data(self):
         scaler = StandardScaler()
-        self.X_train_scaled = scaler.fit_transform(self.X_train)
-        self.X_test_scaled = scaler.transform(self.X_test)
 
+        numeric_cols = self.X_train.select_dtypes(include=['float64', 'int64']).columns.tolist()
+        exclude = ['Store', 'Dept', 'Day_sin', 'Day_cos', 'Month_sin', 'Month_cos', 'Years_since_start']
+        numeric_cols = [c for c in numeric_cols if c not in exclude]
+
+        print("Numerical columns to be standardized:", numeric_cols)
+        self.X_train_scaled = self.X_train.copy()
+        self.X_test_scaled = self.X_test.copy()
+        self.X_train_scaled[numeric_cols] = scaler.fit_transform(self.X_train[numeric_cols])
+        self.X_test_scaled[numeric_cols] = scaler.fit_transform(self.X_test[numeric_cols])
         # print confirmation message
         print("Data scaling complete.")
     
@@ -191,8 +208,8 @@ class NeuralNetwork:
             X_train = X_seq
             y_train = y_seq
         else:
-            X_train = np.asarray(self.X_train_scaled)
-            y_train = np.asarray(self.y_train)
+            X_train = np.asarray(self.X_train_scaled, dtype=np.float32)
+            y_train = np.asarray(self.y_train, dtype=np.float32)
 
         start = time.time()
         self.history = self.model.fit(X_train, y_train, epochs=epochs, batch_size=batch_size ,verbose=2)
@@ -271,8 +288,7 @@ class FeedforwardNN(NeuralNetwork):
         self.model.add(Dense(1))        
         # compile model
         self.model.compile(optimizer='adam', loss='mean_squared_error')
-
-
+    
 class LSTM(NeuralNetwork):
     def __init__(self, dataset, timesteps=5):
         super().__init__(dataset)
@@ -387,8 +403,8 @@ def __main__():
     #dataset = pd.get_dummies(dataset, columns=["Type"], drop_first=True)
     #dataset = dataset.drop(columns=["Fuel_Price", "CPI", "Unemployment"])
     #droppato date
-    #dataset = dataset.drop(columns=["Day", "Month", "Year"]) 
-    
+    #dataset = dataset.drop(columns=["Day", "Month", "Year"])
+
     lin_reg_model = LinReg(dataset)
     lin_reg_model.split_data(target_column="Weekly_Sales")
     lin_reg_model.train()
