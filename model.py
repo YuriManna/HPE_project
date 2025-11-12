@@ -21,13 +21,30 @@ class RegressionModel:
         self.dataset = dataset
         self.model = None
 
-    def split_data(self, test_size=0.2, random_state=42, target_column=None):
-        y = self.dataset.data[target_column]
-        X = self.dataset.data.drop(target_column, axis=1)
-        self.X_train, self.X_test,self.y_train, self.y_test = train_test_split(X, y, test_size=test_size, random_state=random_state)
-        print("\nData splitting complete.")
-        print("Number of training samples:", self.X_train.shape[0])
-        print("Number of test samples:", self.X_test.shape[0])
+    def split_data(self, target_column, group_cols=['Store', 'Dept'], test_size=0.2):
+        X_train_list, X_test_list, y_train_list, y_test_list = [], [], [], []
+        df = self.dataset.data.copy().sort_values(group_cols + ['Date'])
+
+        for _, group in df.groupby(group_cols, observed=True):
+            y = group[target_column].values
+            X = group.drop(columns=[target_column])
+
+            split_index = int(len(group) * (1 - test_size))
+            X_train_list.append(X.iloc[:split_index])
+            X_test_list.append(X.iloc[split_index:])
+            y_train_list.append(y[:split_index])
+            y_test_list.append(y[split_index:])
+
+        self.X_train = pd.concat(X_train_list)
+        self.X_test = pd.concat(X_test_list)
+        self.y_train = np.concatenate(y_train_list)
+        self.y_test = np.concatenate(y_test_list)
+
+        self.X_train = self.X_train.drop(columns='Date')
+        self.X_test = self.X_test.drop(columns='Date')
+
+        print("\n✅ Temporal split per Store/Dept complete.")
+        print(f"Training samples: {self.X_train.shape[0]}  |  Test samples: {self.X_test.shape[0]}")
 
     def train(self):
         if not hasattr(self, "X_train_scaled"):
@@ -176,14 +193,31 @@ class NeuralNetwork:
     def __init__(self, dataset):
         self.dataset = dataset
         self.model = None
-    
-    def split_data(self, test_size=0.2, random_state=42, target_column=None):
-        y = self.dataset.data[target_column]
-        X = self.dataset.data.drop(target_column, axis=1)
-        self.X_train, self.X_test,self.y_train, self.y_test = train_test_split(X, y, test_size=test_size, random_state=random_state)
-        print("\nData splitting complete.")
-        print("Number of training samples:", self.X_train.shape[0])
-        print("Number of test samples:", self.X_test.shape[0])
+
+    def split_data(self, target_column, group_cols=['Store', 'Dept'], test_size=0.2):
+        X_train_list, X_test_list, y_train_list, y_test_list = [], [], [], []
+        df = self.dataset.data.copy().sort_values(group_cols + ['Date'])
+
+        for _, group in df.groupby(group_cols, observed=True):
+            y = group[target_column].values
+            X = group.drop(columns=[target_column])
+
+            split_index = int(len(group) * (1 - test_size))
+            X_train_list.append(X.iloc[:split_index])
+            X_test_list.append(X.iloc[split_index:])
+            y_train_list.append(y[:split_index])
+            y_test_list.append(y[split_index:])
+
+        self.X_train = pd.concat(X_train_list)
+        self.X_test = pd.concat(X_test_list)
+        self.y_train = np.concatenate(y_train_list)
+        self.y_test = np.concatenate(y_test_list)
+
+        self.X_train = self.X_train.drop(columns='Date')
+        self.X_test = self.X_test.drop(columns='Date')
+
+        print("\n✅ Temporal split per Store/Dept complete.")
+        print(f"Training samples: {self.X_train.shape[0]}  |  Test samples: {self.X_test.shape[0]}")
     
     def scale_data(self):
         scaler = StandardScaler()
