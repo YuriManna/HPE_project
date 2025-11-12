@@ -39,13 +39,13 @@ def clean_dataset_without_MarkDown():
 
     print(walmart.data.isna().sum())
 
-    walmart.split_date("Date")
-    walmart.drop_columns(["Date"])
+    #walmart.split_date("Date")
+    #walmart.drop_columns(["Date"])
 
     walmart.convert_nominal(["Type"])
 
     walmart.to_categorical(["Store", "Dept"])
-    walmart.export_data("../dataset_cleaned_without_MarkDown.csv")
+    walmart.export_data("../dataset_cleaned_no_data_noMD.csv")
 
 
 def clean_dataset_with_MarkDown():
@@ -150,8 +150,9 @@ def models():
     model.evaluate()
     '''
 
-models()
+#models()
+create_dataset()
 #clean_dataset_with_MarkDown()
-#clean_dataset_without_MarkDown()
+clean_dataset_without_MarkDown()
 
 #walmart.standardize_dataset(['Store', 'Dept', 'Weekly_Sales'])

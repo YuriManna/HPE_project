@@ -5,8 +5,11 @@ from sklearn.ensemble import RandomForestRegressor
 from sklearn.preprocessing import StandardScaler
 from sklearn.tree import DecisionTreeRegressor
 from xgboost import XGBRegressor
+from statsmodels.tsa.arima.model import ARIMA
 import matplotlib.pyplot as plt
 import seaborn as sns
+import pandas as pd
+import tensorflow as tf
 import numpy as np
 import time
 
@@ -45,6 +48,7 @@ class RegressionModel:
         print(f"MAE: {mae:.3f}")
         print(f"RMSE: {rmse:.3f}")
         print(f"R²: {r2:.3f}")
+
         #self.plots(y_pred)
 
 
@@ -111,6 +115,49 @@ class XGBoostRegressorModel(RegressionModel):
         super().__init__(dataset)
         self.model = XGBRegressor(n_estimators=n_estimators, learning_rate=learning_rate, random_state=random_state)
 
+# Autoregressive models
+class ARIMAModel(RegressionModel):
+    def __init__(self, dataset, order=(2, 1, 2)):
+        super().__init__(dataset)
+        self.order = order
+        self.model_fitted = None
+
+    def split_data(self, test_size=0.2, random_state=42, target_column="Weekly_Sales"):
+        """Override: ARIMA needs a contiguous time-based split."""
+        if target_column:
+            self.target_column = target_column
+
+        y = self.dataset.data[self.target_column].values
+        n = len(y)
+        split_point = int(n * (1 - test_size))
+        self.y_train, self.y_test = y[:split_point], y[split_point:]
+        print(f"\nARIMA time-based split: train={len(self.y_train)}, test={len(self.y_test)}")
+
+    def train(self):
+        """Override: fit ARIMA to training series."""
+        print(f"Training ARIMA{self.order} model...")
+        start = time.time()
+        self.model = ARIMA(self.y_train, order=self.order)
+        self.model_fit = self.model.fit()
+        elapsed = time.time() - start
+        print(f"Training complete in {elapsed:.3f}s")
+
+    def prediction(self):
+        """Override: forecast the same number of test points."""
+        forecast = self.model_fit.forecast(steps=len(self.y_test))
+        return forecast
+
+    def evaluate(self, plots=False):
+        y_pred = self.prediction()
+        mae = mean_absolute_error(self.y_test, y_pred)
+        rmse = np.sqrt(mean_squared_error(self.y_test, y_pred))
+        r2 = r2_score(self.y_test, y_pred)
+        print(f"ARIMA{self.order} Evaluation Metrics:")
+        print(f"MAE: {mae:.3f}")
+        print(f"RMSE: {rmse:.3f}")
+        print(f"R²: {r2:.3f}")
+        if plots:
+            self.plots(y_pred)
 
 from tensorflow.keras.models import Sequential 
 from tensorflow.keras.layers import LSTM as KerasLSTM, Dense, Input 
@@ -224,7 +271,8 @@ class FeedforwardNN(NeuralNetwork):
         self.model.add(Dense(1))        
         # compile model
         self.model.compile(optimizer='adam', loss='mean_squared_error')
-    
+
+
 class LSTM(NeuralNetwork):
     def __init__(self, dataset, timesteps=5):
         super().__init__(dataset)
@@ -327,9 +375,13 @@ class TransformerNN(NeuralNetwork):
 
 
 from Dataset import Dataset
-import pandas as pd
 def __main__():
-    dataset = Dataset("Walmart\\dataset_cleaned_no_MarkDown_split_date.csv")
+    #dataset = Dataset("../dataset_cleaned_no_MarkDown_split_date.csv")
+
+    # Print GPUs visible to TensorFlow
+    print("TF GPUs:", tf.config.list_physical_devices('GPU'))
+
+    dataset = Dataset("/mnt/c/Users/yurim/Documents/Work/Formazione_Experis/codice/Walmart/dataset_cleaned_no_MarkDown_split_date.csv")
     dataset.convert_nominal(columns=["Type"])
     dataset.drop_columns(columns=["Fuel_Price", "CPI", "Unemployment"])
     #dataset = pd.get_dummies(dataset, columns=["Type"], drop_first=True)
@@ -343,6 +395,17 @@ def __main__():
     lin_reg_model.evaluate()
     print(lin_reg_model.model.coef_)
 
+    dataset =  Dataset("/mnt/c/Users/yurim/Documents/Work/Formazione_Experis/codice/Walmart/dataset_cleaned_no_data_noMD.csv")
+    dataset.data["Date"] = pd.to_datetime(dataset.data["Date"])
+    dataset.data = dataset.data.sort_values("Date")
+    dataset.data = dataset.data.set_index("Date")
+
+    arima_model = ARIMAModel(dataset, order=(1,1,1))
+    arima_model.split_data(test_size=0.2, target_column="Weekly_Sales")
+    arima_model.train()
+    arima_model.evaluate(plots=True)
+
+    '''
     lin_reg_model = RidgeModel(dataset)
     lin_reg_model.split_data(target_column="Weekly_Sales")
     lin_reg_model.train()
@@ -383,19 +446,18 @@ def __main__():
     ffn_model.split_data(target_column="Weekly_Sales")
     ffn_model.train(epochs=50)
     ffn_model.evaluate()
-    '''
+    
+    # LSTM model
     lstm_model = LSTM(dataset, timesteps=5)
     lstm_model.split_data(target_column="Weekly_Sales")
 
-    X_seq, y_seq = model.prepare_sequences(target_column="Weekly_Sales")
+    X_seq, y_seq = lstm_model.prepare_sequences(target_column="Weekly_Sales")
     lstm_model.scale_data()
 
-    # Step 4: build and train
-    model.build_model()
-    model.train(epochs=50, batch_size=32)
+    lstm_model.build_model()
+    lstm_model.train(epochs=50, batch_size=32)
 
-    # Step 5: evaluate
-    model.evaluate()
-    '''
+    lstm_model.evaluate()
+'''
 if __name__ == "__main__":
     __main__()
