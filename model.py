@@ -440,12 +440,13 @@ def __main__():
     lin_reg_model.train()
     lin_reg_model.evaluate()
 
-
     # Neural Networks
     ffn_model = FeedforwardNN(dataset)
     ffn_model.split_data(target_column="Weekly_Sales")
     ffn_model.train(epochs=50)
     ffn_model.evaluate()
+
+    ------------------------------------------------------------------------
     
     # LSTM model
     lstm_model = LSTM(dataset, timesteps=5)
