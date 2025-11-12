@@ -1,4 +1,5 @@
 import pandas as pd
+import numpy as np
 from sklearn.preprocessing import StandardScaler
 
 
@@ -88,9 +89,16 @@ class Dataset:
         print(f"---------------------- Splitting date in column {date_col} --------------------------")
         self.data[date_col] = pd.to_datetime(self.data[date_col], format='%Y-%m-%d', errors='coerce')
 
-        self.data['Day'] = self.data[date_col].dt.day
-        self.data['Month'] = self.data[date_col].dt.month
-        self.data['Year'] = self.data[date_col].dt.year
+        day = self.data[date_col].dt.day
+        month = self.data[date_col].dt.month
+        year = self.data[date_col].dt.year
+
+        self.data['Years_since_start'] = year - year.min()
+
+        self.data['Month_sin'] = np.sin(2 * np.pi * month / 12)
+        self.data['Month_cos'] = np.cos(2 * np.pi * month / 12)
+        self.data['Day_sin'] = np.sin(2 * np.pi * day / 31)
+        self.data['Day_cos'] = np.cos(2 * np.pi * day / 31)
 
     def convert_nominal(self, columns):
         """Substitute nominal columns with dummy variables"""
