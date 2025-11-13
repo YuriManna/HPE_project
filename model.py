@@ -2,9 +2,10 @@ from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 from sklearn.linear_model import ElasticNet, Lasso, LinearRegression, Ridge as SKRidge
 from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestRegressor
-from sklearn.preprocessing import StandardScaler
+from sklearn.preprocessing import MinMaxScaler, StandardScaler
 from sklearn.tree import DecisionTreeRegressor
 from xgboost import XGBRegressor
+
 from statsmodels.tsa.arima.model import ARIMA
 import matplotlib.pyplot as plt
 import seaborn as sns
@@ -12,8 +13,11 @@ import pandas as pd
 import tensorflow as tf
 import numpy as np
 import time
+
+from tensorflow.keras.callbacks import EarlyStopping
+from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.models import Sequential
-from tensorflow.keras.layers import LSTM as KerasLSTM, Dense, Input
+from tensorflow.keras.layers import LSTM as KerasLSTM, Dense, Input, Dropout, BatchNormalization
 
 
 class RegressionModel:
@@ -43,7 +47,7 @@ class RegressionModel:
         self.X_train = self.X_train.drop(columns='Date')
         self.X_test = self.X_test.drop(columns='Date')
 
-        print("\n✅ Temporal split per Store/Dept complete.")
+        print("\nTemporal split per Store/Dept complete.")
         print(f"Training samples: {self.X_train.shape[0]}  |  Test samples: {self.X_test.shape[0]}")
 
     def train(self):
@@ -69,7 +73,6 @@ class RegressionModel:
         print(f"R²: {r2:.3f}")
         if plot:
             self.plots(y_pred)
-
 
     def plots(self, y_pred):
         sns.set_theme(style="whitegrid")
@@ -100,7 +103,7 @@ class RegressionModel:
         self.X_train_scaled = self.X_train.copy()
         self.X_test_scaled = self.X_test.copy()
         self.X_train_scaled[numeric_cols] = scaler.fit_transform(self.X_train[numeric_cols])
-        self.X_test_scaled[numeric_cols] = scaler.fit_transform(self.X_test[numeric_cols])
+        self.X_test_scaled[numeric_cols] = scaler.transform(self.X_test[numeric_cols])
         # print confirmation message
         print("Data scaling complete.")
 
@@ -109,38 +112,45 @@ class LinReg(RegressionModel):
     def __init__(self, dataset):
         super().__init__(dataset)
         self.model = LinearRegression()
+        print("\n---------Linear Regression---------")
 
 class RidgeModel(RegressionModel):
     def __init__(self, dataset, alpha=1.0):
         super().__init__(dataset)
         self.model = SKRidge(alpha)
+        print("\n---------Ridge Regression---------")
 
 class LassoModel(RegressionModel):
     def __init__(self, dataset, alpha=1.0):
         super().__init__(dataset)
         self.model = Lasso(alpha)
+        print("\n---------Lasso Regression---------")
 
 class ElasticNetModel(RegressionModel):
     def __init__(self, dataset, alpha=1.0, l1_ratio=0.5, random_state=42):
         super().__init__(dataset)
         self.model = ElasticNet(alpha=alpha, l1_ratio=l1_ratio, random_state=random_state)
+        print("\n---------ElasticNet Regression---------")
 
 # Non-linear tree based models
 class DecisionTreeRegressorModel(RegressionModel):
     def __init__(self, dataset, max_depth=None, random_state=42):
         super().__init__(dataset)
         self.model = DecisionTreeRegressor(max_depth=max_depth, random_state=random_state)
+        print("\n---------Decision Tree Regressor---------")
 
 class RandomForestRegressorModel(RegressionModel):
     def __init__(self, dataset, n_estimators=100, random_state=42):
         super().__init__(dataset)
         self.model = RandomForestRegressor(n_estimators=n_estimators, random_state=random_state)
+        print("\n---------Random Forest Regressor---------")
 
 class XGBoostRegressorModel(RegressionModel):
     def __init__(self, dataset, n_estimators=100, learning_rate=0.1, random_state=42):
         super().__init__(dataset)
         self.model = XGBRegressor(n_estimators=n_estimators, learning_rate=learning_rate, random_state=random_state,
                                   enable_categorical=True, tree_method="hist")
+        print("\n---------XGBoost Regressor---------")
 
 # Autoregressive models
 class ARIMAModel(RegressionModel):
@@ -216,25 +226,35 @@ class NeuralNetwork:
         self.X_train = self.X_train.drop(columns='Date')
         self.X_test = self.X_test.drop(columns='Date')
 
-        print("\n✅ Temporal split per Store/Dept complete.")
+        print("\n Temporal split per Store/Dept complete.")
         print(f"Training samples: {self.X_train.shape[0]}  |  Test samples: {self.X_test.shape[0]}")
     
     def scale_data(self):
-        scaler = StandardScaler()
+        x_scaler = MinMaxScaler()
+        y_scaler = MinMaxScaler()
 
         numeric_cols = self.X_train.select_dtypes(include=['float64', 'int64']).columns.tolist()
-        exclude = ['Store', 'Dept', 'Day_sin', 'Day_cos', 'Month_sin', 'Month_cos', 'Years_since_start']
-        numeric_cols = [c for c in numeric_cols if c not in exclude]
+        #exclude = ['Store', 'Dept', 'Day_sin', 'Day_cos', 'Month_sin', 'Month_cos', 'Years_since_start']
+        #numeric_cols = [c for c in numeric_cols if c not in exclude]
+
+        numeric_cols = [c for c in numeric_cols]
 
         print("Numerical columns to be standardized:", numeric_cols)
         self.X_train_scaled = self.X_train.copy()
         self.X_test_scaled = self.X_test.copy()
-        self.X_train_scaled[numeric_cols] = scaler.fit_transform(self.X_train[numeric_cols])
-        self.X_test_scaled[numeric_cols] = scaler.fit_transform(self.X_test[numeric_cols])
+        self.X_train_scaled[numeric_cols] = x_scaler.fit_transform(self.X_train[numeric_cols])
+        self.X_test_scaled[numeric_cols] = x_scaler.transform(self.X_test[numeric_cols])
+
+        self.y_train_scaled = y_scaler.fit_transform(self.y_train.reshape(-1, 1)).flatten()
+        self.y_test_scaled = y_scaler.transform(self.y_test.reshape(-1, 1)).flatten()
+
+        self.x_scaler = x_scaler
+        self.y_scaler = y_scaler
+
         # print confirmation message
         print("Data scaling complete.")
     
-    def train(self, epochs=1000, batch_size=32, X_seq=None, y_seq=None):
+    def train(self, epochs=1000, batch_size=32, X_seq=None, y_seq=None, patience=10):
         if not hasattr(self, "X_train_scaled"):
             print("Data not scaled yet. Scaling now")
             self.scale_data()
@@ -243,10 +263,17 @@ class NeuralNetwork:
             y_train = y_seq
         else:
             X_train = np.asarray(self.X_train_scaled, dtype=np.float32)
-            y_train = np.asarray(self.y_train, dtype=np.float32)
+            y_train = np.asarray(self.y_train_scaled, dtype=np.float32)
+
+        early_stop = EarlyStopping(
+            monitor='loss',       
+            patience=patience,   
+            restore_best_weights=True,
+            verbose=1,
+        )
 
         start = time.time()
-        self.history = self.model.fit(X_train, y_train, epochs=epochs, batch_size=batch_size ,verbose=2)
+        self.history = self.model.fit(X_train, y_train, epochs=epochs, batch_size=batch_size ,verbose=2, callbacks=[early_stop])
         elapsed = time.time() - start
         print(f"training complete. Elapsed time: {elapsed:.3f} s")
         self.plot_training_history(self.history)
@@ -254,17 +281,55 @@ class NeuralNetwork:
     
     def prediction(self):
         return self.model.predict(self.X_test_scaled)
-    
+
     def evaluate(self):
-        y_pred = self.model.predict(self.X_test_scaled)
-        mae = mean_absolute_error(self.y_test, y_pred)
-        rmse = np.sqrt(mean_squared_error(self.y_test, y_pred))
-        r2 = r2_score(self.y_test, y_pred)
-        print(f"{type(self.model).__name__} Evaluation Metrics:")
-        print(f"MAE: {mae:.3f}")
-        print(f"RMSE: {rmse:.3f}")
-        print(f"R²: {r2:.3f}")
+        y_pred_scaled = self.model.predict(self.X_test_scaled).reshape(-1)
+
+        mae  = mean_absolute_error(self.y_test_scaled, y_pred_scaled)
+        rmse = np.sqrt(mean_squared_error(self.y_test_scaled, y_pred_scaled))
+        r2   = r2_score(self.y_test_scaled, y_pred_scaled)
+
+        mae = mae * (self.y_train.max() - self.y_train.min()) + self.y_train.min()
+        rmse = rmse * (self.y_train.max() - self.y_train.min()) + self.y_train.min()
+        
+
+        print(f"{type(self.model).__name__} scaled Evaluation:")
+        print(f"MAE:  {mae:.4f}") 
+        print(f"RMSE: {rmse:.4f}")
+        print(f"R²:   {r2:.4f}")
+
+        y_pred_scaled = np.nan_to_num(y_pred_scaled, nan=0.0, posinf=10.0, neginf=-10.0)
+
+        # Decide range based on scaler type
+        if hasattr(self.y_scaler, "feature_range"):  # MinMaxScaler
+            lo, hi = self.y_scaler.feature_range
+            y_pred_scaled = np.clip(y_pred_scaled, lo, hi)
+        elif hasattr(self.y_scaler, "scale_"):       # StandardScaler
+            y_pred_scaled = np.clip(y_pred_scaled, -5, 5)  # ≈±5σ covers >99.9999% of data
+
+        # --- Convert back to original units ---
+        y_pred = y_pred_scaled * (self.y_train.max() - self.y_train.min()) + self.y_train.min()
+
+        if not np.all(np.isfinite(y_pred)):
+            print("Non-finite values still found after inverse scaling. Check scaling pipeline.")
+
         self.plots(y_pred)
+    '''
+
+    def evaluate(self):
+        y_pred = self.model.predict(self.X_test_scaled).reshape(-1)
+
+        mae  = mean_absolute_error(self.y_test, y_pred)
+        rmse = np.sqrt(mean_squared_error(self.y_test, y_pred))
+        r2   = r2_score(self.y_test, y_pred)
+
+        print(f"{type(self.model).__name__} scaled Evaluation:")
+        print(f"MAE:  {mae:.4f}")
+        print(f"RMSE: {rmse:.4f}")
+        print(f"R²:   {r2:.4f}")
+
+        self.plots(y_pred)
+    '''
 
     def plot_training_history(self, history):
         """Plot loss / val_loss from a Keras History (or dict with 'loss'/'val_loss')."""
@@ -313,59 +378,87 @@ class NeuralNetwork:
 class FeedforwardNN(NeuralNetwork):
     def __init__(self, dataset):
         super().__init__(dataset)
-        n_cols = self.dataset.data.shape[1] - 1
+        n_cols = self.dataset.data.shape[1] - 2  # exclude target and Date
         # create model
+        #opt = Adam(learning_rate=1e-3, clipnorm=1.0)
         self.model = Sequential()
         self.model.add(Input(shape=(n_cols,)))
-        self.model.add(Dense(50, activation='relu'))
-        self.model.add(Dense(50, activation='relu'))
-        self.model.add(Dense(1))        
+        self.model.add(Dense(64, activation='relu'))
+        self.model.add(Dense(128, activation='relu'))
+        self.model.add(Dense(64, activation='relu'))
+        self.model.add(Dense(1))
         # compile model
-        self.model.compile(optimizer='adam', loss='mean_squared_error')
+        self.model.compile(optimizer='adam', loss='mse')
+        print("\n-----Feedforward Neural Network-----")
     
 class LSTM(NeuralNetwork):
     def __init__(self, dataset, timesteps=5):
         super().__init__(dataset)
         self.timesteps = timesteps
+        print("\n---------LSTM Neural Network---------")
 
-    def prepare_sequences(self, target_column):
-        """Convert tabular data into 3D sequences (samples, timesteps, features)."""
-        data = self.dataset.data.copy().sort_values("Date")
-        y = data[target_column].values
-        X = data.drop(columns=[target_column]).values
+    # Parent's split_data() will be called BEFORE sequence creation
+    # so we no longer split inside this class.
 
-        X_seq, y_seq = [], []
-        for i in range(self.timesteps, len(X)):
-            X_seq.append(X[i-self.timesteps:i])
-            y_seq.append(y[i])
+    def prepare_sequences(self):
+        """
+        Convert tabular training and test data (from split_data)
+        into 3D sequences (samples, timesteps, features).
+        """
+        def make_sequences(X_df, y_arr, timesteps):
+            #X_df = X_df.select_dtypes(include=[np.number])  # drop non-numerics
+            X_values = X_df.to_numpy(dtype=np.float32)
+            X_seq, y_seq = [], []
+            for i in range(timesteps, len(X_values)):
+                X_seq.append(X_values[i - timesteps:i])
+                y_seq.append(y_arr[i])
+            return np.array(X_seq), np.array(y_seq)
 
-        X_seq = np.array(X_seq)
-        y_seq = np.array(y_seq)
-        print(f"Sequences created: {X_seq.shape}, Target: {y_seq.shape}")
-        return X_seq, y_seq
+        # Build sequences separately for train and test
+        self.X_train_seq, self.y_train_seq = make_sequences(self.X_train, self.y_train, self.timesteps)
+        self.X_test_seq, self.y_test_seq = make_sequences(self.X_test, self.y_test, self.timesteps)
+
+        print(f"Train sequences: {self.X_train_seq.shape}, Test sequences: {self.X_test_seq.shape}")
+        return self.X_train_seq, self.y_train_seq
+
+    def scale_data(self, feature_range=(-1, 1)):
+        """Apply MinMax scaling to 3D sequence data and targets."""
+        feature_scaler = MinMaxScaler(feature_range=feature_range)
+        target_scaler = MinMaxScaler(feature_range=feature_range)
+
+        n_train, t, n_feat = self.X_train_seq.shape
+        n_test = self.X_test_seq.shape[0]
+
+        # Flatten for scaling
+        X_train_2d = self.X_train_seq.reshape(-1, n_feat)
+        X_test_2d = self.X_test_seq.reshape(-1, n_feat)
+
+        # Fit on train, transform both
+        self.X_train_scaled = feature_scaler.fit_transform(X_train_2d).reshape(n_train, t, n_feat)
+        self.X_test_scaled = feature_scaler.transform(X_test_2d).reshape(n_test, t, n_feat)
+
+        # Scale y separately
+        self.y_train_scaled = target_scaler.fit_transform(self.y_train_seq.reshape(-1, 1)).flatten()
+        self.y_test_scaled = target_scaler.transform(self.y_test_seq.reshape(-1, 1)).flatten()
+
+        self.feature_scaler = feature_scaler
+        self.target_scaler = target_scaler
+        print(f"MinMax scaling done. Range: {feature_range}")
 
     def build_model(self):
-        """Create and compile the LSTM model."""
+        """Create and compile the LSTM model with an explicit Input layer."""
         n_features = self.X_train_scaled.shape[2]
+
         self.model = Sequential([
-            KerasLSTM(64, activation='tanh', input_shape=(self.timesteps, n_features)),
+            Input(shape=(self.timesteps, n_features)),
+            KerasLSTM(64, activation='tanh'),
             Dense(32, activation='relu'),
-            Dense(1)
+            Dense(1, activation='tanh')  # matches scaled y range (-1,1)
         ])
+
         self.model.compile(optimizer='adam', loss='mean_squared_error')
-        print(self.model.summary())
-
-    def scale_data(self):
-        """Override scaling to handle 3D (samples, timesteps, features) input."""
-        scaler = StandardScaler()
-        n_samples, timesteps, n_features = self.X_train.shape
-
-        X_train_2d = self.X_train.reshape(-1, n_features)
-        X_test_2d = self.X_test.reshape(-1, n_features)
-
-        self.X_train_scaled = scaler.fit_transform(X_train_2d).reshape(n_samples, timesteps, n_features)
-        self.X_test_scaled = scaler.transform(X_test_2d).reshape(self.X_test.shape)
-        print("LSTM data scaling complete.")
+        self.model.summary()
+        print("LSTM model compiled successfully.")
 
 from tensorflow.keras import layers, models
 from tensorflow.keras.layers import MultiHeadAttention, LayerNormalization, Dropout, Dense, Input
