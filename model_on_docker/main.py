@@ -5,6 +5,8 @@ import joblib
 import os
 import math
 from datetime import datetime
+import tensorflow as tf
+from keras.models import load_model
 
 app = Flask(__name__)
 
@@ -54,12 +56,6 @@ def preprocess_input(data):
 # === Endpoint Flask ===
 @app.route('/predict/<model_name>', methods=['POST'])
 def predict(model_name):
-    model_path = os.path.join("models", f"{model_name}.pkl")
-
-    if not os.path.exists(model_path):
-        return jsonify({"error": f"Model '{model_name}' not found."}), 404
-
-    model = joblib.load(model_path)
     data = request.get_json(force=True)
 
     try:
@@ -67,12 +63,62 @@ def predict(model_name):
     except Exception as e:
         return jsonify({"error": f"Errore nel preprocessing: {str(e)}"}), 400
 
-    # Previsione
-    try:
-        prediction = model.predict(input_data)
-        return jsonify({"prediction": prediction.tolist()})
-    except Exception as e:
-        return jsonify({"error": f"Errore nella previsione: {str(e)}"}), 500
+    if model_name == 'ffn_model':
+        try:
+            # Carica scalers
+            x_scaler = joblib.load("models/NN_x_scaler.pkl")
+            y_scaler = joblib.load("models/NN_y_scaler.pkl")
+
+            # Carica modello keras
+            model = load_model("models/ffn_model.keras")
+
+            # Standardizza input
+            mask = [0,1,3,4,5,6,7,8,9]
+            input_data[:, mask] = x_scaler.transform(input_data[:, mask])
+
+            # Predici
+            y_scaled = model.predict(input_data)
+            print(y_scaled)
+            # De-standardizza output
+            y_pred = y_scaler.inverse_transform(y_scaled)[0][0]
+            #y_pred = y_scaled * 693099.36
+
+            return jsonify({"prediction": float(y_pred)})
+
+        except Exception as e:
+            return jsonify({"error": f"Errore FFN: {str(e)}"}), 500
+
+    else:
+        try:
+            model_path = os.path.join("models", f"{model_name}.pkl")
+            scaler_path = os.path.join("models", "linear_regression_scaler.pkl")
+
+            if not os.path.exists(model_path):
+                return jsonify({"error": "Model file not found"}), 404
+            if not os.path.exists(scaler_path):
+                return jsonify({"error": "Scaler file not found"}), 404
+
+
+            # Caricamenti
+            model = joblib.load(model_path)
+            scaler = joblib.load(scaler_path)
+
+            # Standardizza solo le colonne corrette
+            try:
+                input_data[:, 3:5] = scaler.transform(input_data[:, 3:5])
+            except Exception as e:
+                return jsonify({"error": f"Errore nella standardizzazione: {str(e)}"}), 400
+
+            # Predizione
+            try:
+                prediction = model.predict(input_data)
+                return jsonify({"prediction": prediction.tolist()})
+            except Exception as e:
+                return jsonify({"error": f"Errore nella previsione: {str(e)}"}), 500
+
+
+        except Exception as e:
+            return jsonify({"error": f"Errore modello sklearn: {str(e)}"}), 500
 
 
 if __name__ == '__main__':
