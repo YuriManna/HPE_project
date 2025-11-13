@@ -8,7 +8,45 @@ from datetime import datetime
 import tensorflow as tf
 from keras.models import load_model
 
+# Prometheus
+from prometheus_client import Counter, Histogram, generate_latest, CONTENT_TYPE_LATEST
+from time import time
+
+
 app = Flask(__name__)
+
+# 🔥 1. METRICHE PROMETHEUS QUI (subito dopo app = Flask)
+REQUEST_COUNT = Counter(
+    "app_requests_total",
+    "Totale richieste ricevute",
+    ["method", "endpoint"]
+)
+
+REQUEST_LATENCY = Histogram(
+    "app_request_latency_seconds",
+    "Latenza delle richieste",
+    ["endpoint"]
+)
+
+@app.before_request
+def before_request():
+    request.start_time = time()
+
+@app.after_request
+def after_request(response):
+    # conta quante richieste arrivano per metodo + endpoint
+    REQUEST_COUNT.labels(request.method, request.path).inc()
+
+    # calcola latenza
+    latency = time() - request.start_time
+    REQUEST_LATENCY.labels(request.path).observe(latency)
+
+    return response
+
+# endpoint che Prometheus leggerà
+@app.route("/metrics")
+def metrics():
+    return generate_latest(), 200, {"Content-Type": CONTENT_TYPE_LATEST}
 
 @app.route('/')
 def home():
