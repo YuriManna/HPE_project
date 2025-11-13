@@ -1,15 +1,17 @@
 <!DOCTYPE html>
 <html lang="it">
+
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Walmart Forecasting</title>
   <script src="https://cdn.tailwindcss.com"></script>
 </head>
+
 <body class="bg-slate-50 min-h-screen flex flex-col items-center justify-center p-6">
   <div class="card w-full max-w-2xl p-6 space-y-6">
     <h1 class="text-2xl font-semibold text-center">Predizione vendite settimanali di Walmart</h1>
-      <p class="text-center text-slate-600 max-w-2xl mx-auto">
+    <p class="text-center text-slate-600 max-w-2xl mx-auto">
       Questo strumento ti permette di ottenere una previsione automatica delle vendite settimanali di un negozio Walmart
       utilizzando i modelli di machine learning di Walmart.
       Inserisci i dati relativi al negozio, al reparto, alla data e alle condizioni del periodo,
@@ -67,120 +69,140 @@
             <option value="C">C</option>
           </select>
         </div>
-          <!-- Selezione modello -->
-      <div>
-        <label class="block text-sm font-medium text-slate-700 mb-1">Seleziona modello</label>
-        <select id="modelSelect" class="w-full border rounded-xl px-4 py-2" required>
-          <option value="">-- scegli un modello --</option>
-          <option value="linear_regression_model">Linear Regression</option>
-          <option value="ridge_regression_model">Ridge Regression</option>
-          <option value="lasso_regression_model">Lasso Regression</option>
-          <option value="decision_tree">Decision Tree</option>
-          <option value="random_forest">Random Forest</option>
-          <option value="xg_boost">XGBoost</option>
-          <option value="ffn_model">Neural Network</option>
-        </select>
+        <!-- Selezione modello -->
+        <div>
+          <label class="block text-sm font-medium text-slate-700 mb-1">Seleziona modello</label>
+          <select id="modelSelect" class="w-full border rounded-xl px-4 py-2" required>
+            <option value="">-- scegli un modello --</option>
+            <option value="linear_regression_model">Linear Regression</option>
+            <option value="ridge_regression_model">Ridge Regression</option>
+            <option value="lasso_regression_model">Lasso Regression</option>
+            <option value="decision_tree">Decision Tree</option>
+            <option value="random_forest">Random Forest</option>
+            <option value="xg_boost">XGBoost</option>
+            <option value="ffn_model">Neural Network</option>
+          </select>
+        </div>
       </div>
-      </div>
 
 
 
-        <div class="flex flex-col md:flex-row gap-3">
-          <button type="submit" class="w-full bg-blue-600 text-white rounded-xl py-2 font-medium hover:bg-blue-700">
-            Predici
-          </button>
-         <!--    <button id="compareBtn" type="button" class="w-full bg-emerald-600 text-white rounded-xl py-2 font-medium hover:bg-emerald-700">
+      <div class="flex flex-col md:flex-row gap-3">
+        <button type="submit" class="w-full bg-blue-600 text-white rounded-xl py-2 font-medium hover:bg-blue-700">
+          Predici
+        </button>
+        <!--    <button id="compareBtn" type="button" class="w-full bg-emerald-600 text-white rounded-xl py-2 font-medium hover:bg-emerald-700">
                 Confronta tutti i modelli
             </button> -->
-        </div>
+      </div>
 
     </form>
 
     <div id="result" class="text-center text-lg font-semibold text-slate-800"></div>
   </div>
+  <div class="mt-8 p-4 border rounded-xl bg-white shadow-sm">
+
+    <h2 class="text-xl font-semibold mb-3">Forecast a lungo termine</h2>
+
+    <div class="grid grid-cols-2 gap-4">
+      <div>
+        <label class="block text-sm font-medium">Settimane da prevedere</label>
+        <input id="weeks" type="number" value="12" min="1" max="200" class="w-full border rounded-xl px-4 py-2" />
+      </div>
+
+      <div class="flex items-end">
+        <button onclick="makeForecast()"
+          class="w-full bg-emerald-600 text-white rounded-xl py-2 font-medium hover:bg-emerald-700">
+          Genera Forecast
+        </button>
+      </div>
+    </div>
+
+    <div id="forecast_output" class="mt-6 text-center"></div>
+  </div>
 
   <script>
-      const form = document.getElementById('predictForm');
-      const resultDiv = document.getElementById('result');
-      const compareBtn = document.getElementById('compareBtn');
+    const form = document.getElementById('predictForm');
+    const resultDiv = document.getElementById('result');
+    const compareBtn = document.getElementById('compareBtn');
 
-      // Elenco modelli disponibili
-      const models = ['linear_regression', 'random_forest', 'xgboost'];
+    // Elenco modelli disponibili
+    const models = ['linear_regression', 'random_forest', 'xgboost'];
 
-      // Funzione per creare il payload dai campi
-      function getPayload() {
-        return {
-          Store: parseInt(document.getElementById('Store').value),
-          Dept: parseInt(document.getElementById('Dept').value),
-          Date: document.getElementById('Date').value,
-          IsHoliday: document.getElementById('IsHoliday').checked ? 1 : 0,
-          Temperature: parseFloat(document.getElementById('Temperature').value),
-          Size: parseFloat(document.getElementById('Size').value),
-          Type: document.getElementById('Type').value
-        };
+    // Funzione per creare il payload dai campi
+    function getPayload() {
+      return {
+        Store: parseInt(document.getElementById('Store').value),
+        Dept: parseInt(document.getElementById('Dept').value),
+        Date: document.getElementById('Date').value,
+        IsHoliday: document.getElementById('IsHoliday').checked ? 1 : 0,
+        Temperature: parseFloat(document.getElementById('Temperature').value),
+        Size: parseFloat(document.getElementById('Size').value),
+        Type: document.getElementById('Type').value
+      };
+    }
+
+    // Singola predizione
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const modelName = document.getElementById('modelSelect').value;
+      const payload = getPayload();
+
+      if (!modelName) {
+        resultDiv.textContent = 'Seleziona un modello';
+        return;
       }
 
-      // Singola predizione
-      form.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const modelName = document.getElementById('modelSelect').value;
-        const payload = getPayload();
+      resultDiv.textContent = '⏳ Calcolo in corso...';
 
-        if (!modelName) {
-          resultDiv.textContent = '⚠️ Seleziona un modello';
-          return;
+      try {
+        const response = await fetch(`/predict/${modelName}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+
+        const data = await response.json();
+        if (data.error) {
+          resultDiv.textContent = `Errore: ${data.error}`;
+        } else {
+          const predictionValue = Array.isArray(data.prediction) ? data.prediction[0] : data.prediction;
+          const rounded = Number(predictionValue).toFixed(2);
+          resultDiv.textContent = `Predizione: ${rounded}$`;
         }
+      } catch (err) {
+        resultDiv.textContent = 'Errore di rete o server';
+      }
+    });
 
-        resultDiv.textContent = '⏳ Calcolo in corso...';
+    // Confronto di tutti i modelli
+    compareBtn.addEventListener('click', async () => {
+      const payload = getPayload();
+      resultDiv.innerHTML = '<p>⏳ Confronto in corso...</p>';
 
+      let results = [];
+
+      for (const modelName of models) {
         try {
-          const response = await fetch(`/predict/${modelName}`, {
+          const res = await fetch(`/predict/${modelName}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload)
           });
-
-          const data = await response.json();
+          const data = await res.json();
           if (data.error) {
-            resultDiv.textContent = `❌ Errore: ${data.error}`;
-          } else {
-            const predictionValue = Array.isArray(data.prediction) ? data.prediction[0] : data.prediction;
-            const rounded = Number(predictionValue).toFixed(2);
-            resultDiv.textContent = `✅ Predizione: ${rounded}$`;
-          }
-        } catch (err) {
-          resultDiv.textContent = '❌ Errore di rete o server';
-        }
-      });
-
-      // Confronto di tutti i modelli
-      compareBtn.addEventListener('click', async () => {
-        const payload = getPayload();
-        resultDiv.innerHTML = '<p>⏳ Confronto in corso...</p>';
-
-        let results = [];
-
-        for (const modelName of models) {
-          try {
-            const res = await fetch(`/predict/${modelName}`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify(payload)
-            });
-            const data = await res.json();
-            if (data.error) {
-              results.push({ model: modelName, prediction: 'Errore' });
-            } else {
-              const value = Array.isArray(data.prediction) ? data.prediction[0] : data.prediction;
-              results.push({ model: modelName, prediction: Number(value).toFixed(2) });
-            }
-          } catch {
             results.push({ model: modelName, prediction: 'Errore' });
+          } else {
+            const value = Array.isArray(data.prediction) ? data.prediction[0] : data.prediction;
+            results.push({ model: modelName, prediction: Number(value).toFixed(2) });
           }
+        } catch {
+          results.push({ model: modelName, prediction: 'Errore' });
         }
+      }
 
-        // Mostra risultati
-        let html = `
+      // Mostra risultati
+      let html = `
           <h2 class="text-lg font-semibold mb-2">Risultati del confronto</h2>
           <table class="min-w-full text-sm border border-slate-200 rounded-xl">
             <thead class="bg-slate-100">
@@ -195,9 +217,74 @@
             </tbody>
           </table>
         `;
-        resultDiv.innerHTML = html;
-      });
-    </script>
+      resultDiv.innerHTML = html;
+    });
+    async function makeForecast() {
+      const modelName = document.getElementById('modelSelect').value;
+      const weeks = parseInt(document.getElementById('weeks').value);
+      const payload = getPayload();
+      payload.weeks = weeks;
+
+      const output = document.getElementById("forecast_output");
+
+      if (!modelName) {
+        output.innerHTML = "Seleziona un modello per il forecast.";
+        return;
+      }
+
+      output.innerHTML = "⏳ Generazione forecast...";
+
+      try {
+        const response = await fetch(`/forecast/${modelName}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
+
+        const data = await response.json();
+
+        if (data.error) {
+          output.innerHTML = `Errore: ${data.error}`;
+          return;
+        }
+
+        // 👉 Se il backend manda un grafico PNG base64
+        if (data.plot) {
+          output.innerHTML = `
+          <h3 class="text-lg font-semibold mb-3">Forecast (${weeks} settimane)</h3>
+          <img class="mx-auto rounded-xl shadow" src="data:image/png;base64,${data.plot}">
+        `;
+          return;
+        }
+
+        // 👉 Se manda i dati in lista
+        let html = `
+        <h3 class="text-lg font-semibold mb-3">Forecast (${weeks} settimane)</h3>
+        <table class="min-w-full text-sm border border-slate-200 rounded-xl">
+          <thead class="bg-slate-100">
+            <tr><th class="py-2 px-4">Data</th><th class="py-2 px-4">Predizione</th></tr>
+          </thead>
+          <tbody>
+      `;
+
+        data.dates.forEach((d, idx) => {
+          html += `
+          <tr class="border-t">
+            <td class="py-2 px-4">${d}</td>
+            <td class="py-2 px-4 font-medium">${data.forecast[idx].toFixed(2)}$</td>
+          </tr>
+        `;
+        });
+
+        html += `</tbody></table>`;
+        output.innerHTML = html;
+
+      } catch (err) {
+        output.innerHTML = "Errore durante il forecast.";
+      }
+    }  
+  </script>
 
 </body>
+
 </html>
