@@ -3,6 +3,8 @@ __pycache__/
 *.py[codz]
 *$py.class
 
+model_on_docker/models
+
 # Vsual Studio cache files
 .vscode
 
