@@ -1,6 +1,7 @@
 import os
 from Dataset import Dataset
 from model import *
+import joblib
 from tensorflow.keras import mixed_precision
 
 def create_dataset():
@@ -101,21 +102,29 @@ def models():
     lin_reg_model.train()
     lin_reg_model.evaluate()
     print(lin_reg_model.model.coef_)
-    
+    joblib.dump(lin_reg_model.model, "model_on_docker/models/linear_regression_model.pkl")
+    print("Modello salvato in 'linear_regression_model.pkl'")
+
     lin_reg_model = RidgeModel(dataset)
     lin_reg_model.split_data(target_column="Weekly_Sales")
     lin_reg_model.train()
     lin_reg_model.evaluate(plot=True)
+    joblib.dump(lin_reg_model.model, "model_on_docker/models/ridge_regression_model.pkl")
+    print("Modello salvato in 'ridge_regression_model.pkl'")
 
     lin_reg_model = LassoModel(dataset)
     lin_reg_model.split_data(target_column="Weekly_Sales")
     lin_reg_model.train()
     lin_reg_model.evaluate(plot=True)
+    joblib.dump(lin_reg_model.model, "model_on_docker/models/lasso_regression_model.pkl")
+    print("Modello salvato in 'lasso_regression_model.pkl'")
 
     lin_reg_model = ElasticNetModel(dataset)
     lin_reg_model.split_data(target_column="Weekly_Sales")
     lin_reg_model.train()
     lin_reg_model.evaluate(plot=True)
+    joblib.dump(lin_reg_model.model, "model_on_docker/models/elastic_net_model.pkl")
+    print("Modello salvato in 'elastic_net_model.pkl'")
 
     # Non-linear models
     dataset.data['Store'] = dataset.data['Store'].astype('category')
@@ -125,20 +134,29 @@ def models():
     lin_reg_model.split_data(target_column="Weekly_Sales")
     lin_reg_model.train()
     lin_reg_model.evaluate(plot=True)
+    joblib.dump(lin_reg_model.model, "model_on_docker/models/decision_tree.pkl")
+    print("Modello salvato in 'decision_tree.pkl'")
 
     lin_reg_model = RandomForestRegressorModel(dataset)
     lin_reg_model.split_data(target_column="Weekly_Sales")
     lin_reg_model.train()
     lin_reg_model.evaluate(plot=True)
+    joblib.dump(lin_reg_model.model, "model_on_docker/models/random_forest.pkl")
+    print("Modello salvato in 'random_forest.pkl'")
 
     lin_reg_model = XGBoostRegressorModel(dataset)
     lin_reg_model.split_data(target_column="Weekly_Sales")
     lin_reg_model.train()
     lin_reg_model.evaluate(plot=True)
+    joblib.dump(lin_reg_model.model, "model_on_docker/models/xg_boost.pkl")
+    print("Modello salvato in 'xg_boost.pkl'")
+    '''
+    arima_model = ARIMAModel(dataset, order=(1, 1, 1))
+    arima_model.split_data(test_size=0.2, target_column="Weekly_Sales")
+    arima_model.train()
+    arima_model.evaluate(plots=True)
     
     # Neural Networks
-
-    '''
     '''
     lstm_model = LSTM(dataset, timesteps=5)
     lstm_model.split_data(target_column="Weekly_Sales")
@@ -160,8 +178,9 @@ def __main__():
     #clean_dataset_with_MarkDown()
     #create_dataset()
     #clean_dataset_without_MarkDown()
-    models()
-    #walmart.standardize_dataset(['Store', 'Dept', 'Weekly_Sales'])
+    models()    
+    walmart = Dataset('../dataset_cleaned_without_MarkDown.csv')
+    walmart.visualize_dataset()
 
 if __name__ == "__main__":
     __main__()
